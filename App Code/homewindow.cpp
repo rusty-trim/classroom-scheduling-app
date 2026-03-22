@@ -26,6 +26,8 @@
 #include <QEvent>
 #include <functional>
 
+#include "database.h"
+
 //this function catches the clicks or taps from the user to skip animation
 namespace {
 class AnimSkipFilter : public QObject {
@@ -121,55 +123,65 @@ bool HomeWindow::setupDatabase()
         return false;
     }
 
-    QSqlQuery query;
-    // Create Rooms Table
-    query.exec("CREATE TABLE IF NOT EXISTS rooms ("
-               "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-               "name TEXT UNIQUE)");
+    // Creates tables
+    if(!Database::Room::create())
+        return false;
 
-    // Create Reservations Table
-    query.exec("CREATE TABLE IF NOT EXISTS reservations ("
-               "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-               "name TEXT, "
-               "room TEXT, "
-               "start_date TEXT, "
-               "start_time TEXT, "
-               "end_time TEXT, "
-               "end_date TEXT, "
-               "recurrence TEXT, "
-               "overwriteable INTEGER)"); // SQLite uses 1 for True, 0 for False
+    if(!Database::Reservation::create())
+        return false;
 
     return true;
 }
 
 void HomeWindow::loadRoomsFromDatabase()
 {
-    QSqlQuery query("SELECT name FROM rooms");
-    while (query.next()) {
-        QString roomName = query.value(0).toString();
-        ui->roomComboBox->addItem(roomName);
-        ui->filterRoomComboBox->addItem(roomName);
-    }
+    // QSqlQuery query("SELECT name FROM rooms");
+    // while (query.next()) {
+    //     QString roomName = query.value(0).toString();
+    //     ui->roomComboBox->addItem(roomName);
+    //     ui->filterRoomComboBox->addItem(roomName);
+    // }
+
+    QStringList rooms = Database::Room::retrieve();
+    ui->roomComboBox->addItems(rooms);
+    ui->filterRoomComboBox->addItems(rooms);
 }
 
 void HomeWindow::loadReservationsFromDatabase()
 {
-    QSqlQuery query("SELECT id, name, room, start_date, start_time, end_time, end_date, recurrence, overwriteable FROM reservations");
-    while (query.next()) {
-        int newRow = ui->reservationTable->rowCount();
-        ui->reservationTable->insertRow(newRow);
+    // QSqlQuery query("SELECT id, name, room, start_date, start_time, end_time, end_date, recurrence, overwriteable FROM reservations");
+    // while (query.next()) {
+    //     int newRow = ui->reservationTable->rowCount();
+    //     ui->reservationTable->insertRow(newRow);
 
-        ui->reservationTable->setItem(newRow, 0, new QTableWidgetItem(query.value(0).toString())); // ID
-        ui->reservationTable->setItem(newRow, 1, new QTableWidgetItem(query.value(1).toString())); // Name
-        ui->reservationTable->setItem(newRow, 2, new QTableWidgetItem(query.value(2).toString())); // Room
-        ui->reservationTable->setItem(newRow, 3, new QTableWidgetItem(query.value(3).toString())); // Start Date
-        ui->reservationTable->setItem(newRow, 4, new QTableWidgetItem(query.value(4).toString())); // Start Time
-        ui->reservationTable->setItem(newRow, 5, new QTableWidgetItem(query.value(5).toString())); // End Time
-        ui->reservationTable->setItem(newRow, 6, new QTableWidgetItem(query.value(6).toString())); // End Date
-        ui->reservationTable->setItem(newRow, 7, new QTableWidgetItem(query.value(7).toString())); // Recurrence
+    //     ui->reservationTable->setItem(newRow, 0, new QTableWidgetItem(query.value(0).toString())); // ID
+    //     ui->reservationTable->setItem(newRow, 1, new QTableWidgetItem(query.value(1).toString())); // Name
+    //     ui->reservationTable->setItem(newRow, 2, new QTableWidgetItem(query.value(2).toString())); // Room
+    //     ui->reservationTable->setItem(newRow, 3, new QTableWidgetItem(query.value(3).toString())); // Start Date
+    //     ui->reservationTable->setItem(newRow, 4, new QTableWidgetItem(query.value(4).toString())); // Start Time
+    //     ui->reservationTable->setItem(newRow, 5, new QTableWidgetItem(query.value(5).toString())); // End Time
+    //     ui->reservationTable->setItem(newRow, 6, new QTableWidgetItem(query.value(6).toString())); // End Date
+    //     ui->reservationTable->setItem(newRow, 7, new QTableWidgetItem(query.value(7).toString())); // Recurrence
 
-        bool isOverwriteable = query.value(8).toInt() == 1;
-        ui->reservationTable->setItem(newRow, 8, new QTableWidgetItem(isOverwriteable ? "Yes" : "No")); // Overwriteable
+    //     bool isOverwriteable = query.value(8).toInt() == 1;
+    //     ui->reservationTable->setItem(newRow, 8, new QTableWidgetItem(isOverwriteable ? "Yes" : "No")); // Overwriteable
+    // }
+
+    auto reservations = Database::Reservation::retrieve();
+
+    for (const auto &r : reservations) {
+        int row = ui->reservationTable->rowCount();
+        ui->reservationTable->insertRow(row);
+
+        ui->reservationTable->setItem(row, 0, new QTableWidgetItem(QString::number(r.id)));
+        ui->reservationTable->setItem(row, 1, new QTableWidgetItem(r.name));
+        ui->reservationTable->setItem(row, 2, new QTableWidgetItem(r.room));
+        ui->reservationTable->setItem(row, 3, new QTableWidgetItem(r.startDate.toString()));
+        ui->reservationTable->setItem(row, 4, new QTableWidgetItem(r.startTime.toString()));
+        ui->reservationTable->setItem(row, 5, new QTableWidgetItem(r.endTime.toString()));
+        ui->reservationTable->setItem(row, 6, new QTableWidgetItem(r.endDate.toString()));
+        // ui->reservationTable->setItem(row, 7, new QTableWidgetItem(QString::number(r.recurrence)));
+        ui->reservationTable->setItem(row, 8, new QTableWidgetItem(r.overwriteable ? "Yes" : "No"));
     }
 }
 
@@ -202,17 +214,15 @@ void HomeWindow::on_btnCreateRoom_clicked()
 
     if (reply == QMessageBox::Yes) {
         // SAVE TO DATABASE
-        QSqlQuery query;
-        query.prepare("INSERT INTO rooms (name) VALUES (:name)");
-        query.bindValue(":name", fullRoomName);
+        QString error;
 
-        if (query.exec()) {
+        if (Database::Room::insert(fullRoomName, error)) {
             QMessageBox::information(this, "Success", "Room created successfully.");
             ui->roomComboBox->addItem(fullRoomName);
             ui->filterRoomComboBox->addItem(fullRoomName);
             ui->roomInput->clear();
         } else {
-            QMessageBox::warning(this, "Error", "Room already exists or database error.");
+            QMessageBox::warning(this, "Error", error);
         }
     }
 }
@@ -230,11 +240,12 @@ void HomeWindow::on_btnDeleteRoom_clicked()
 
     if (reply == QMessageBox::Yes) {
         // DELETE FROM DATABASE
-        QSqlQuery query;
-        query.prepare("DELETE FROM rooms WHERE name = :name");
-        query.bindValue(":name", fullRoomName);
+        // QSqlQuery query;
+        // query.prepare("DELETE FROM rooms WHERE name = :name");
+        // query.bindValue(":name", fullRoomName);
 
-        if (query.exec()) {
+        if(Database::Room::remove(fullRoomName))
+        {
             QMessageBox::information(this, "Success", "Room deleted successfully.");
 
             int createIdx = ui->roomComboBox->findText(fullRoomName);
@@ -244,6 +255,10 @@ void HomeWindow::on_btnDeleteRoom_clicked()
             if (filterIdx != -1) ui->filterRoomComboBox->removeItem(filterIdx);
 
             ui->roomInput->clear();
+        }
+        else
+        {
+            QMessageBox::warning(this, "Error", "Failed to delete room.");
         }
     }
 }
@@ -258,7 +273,7 @@ void HomeWindow::on_btnCreateReservation_clicked()
     QString startTime = ui->startTimeComboBox->currentText();
     QString endTime = ui->endTimeComboBox->currentText();
     QString endDate = ui->endDateEdit->date().toString("MM/dd/yyyy");
-    QString recurrence = ui->recurrenceComboBox->currentText();
+    // QString recurrence = ui->recurrenceComboBox->currentText();
     bool isOverwriteable = ui->overwriteCheckBox->isChecked();
     int dbOverwriteable = isOverwriteable ? 1 : 0; // Convert to int for DB
 
@@ -268,35 +283,34 @@ void HomeWindow::on_btnCreateReservation_clicked()
     }
 
     // 1. SAVE TO DATABASE
-    QSqlQuery query;
-    query.prepare("INSERT INTO reservations (name, room, start_date, start_time, end_time, end_date, recurrence, overwriteable) "
-                  "VALUES (:name, :room, :start_date, :start_time, :end_time, :end_date, :recurrence, :overwriteable)");
-    query.bindValue(":name", resName);
-    query.bindValue(":room", room);
-    query.bindValue(":start_date", startDate);
-    query.bindValue(":start_time", startTime);
-    query.bindValue(":end_time", endTime);
-    query.bindValue(":end_date", endDate);
-    query.bindValue(":recurrence", recurrence);
-    query.bindValue(":overwriteable", dbOverwriteable);
+    Database::Reservation r;
+    r.name = resName;
+    r.room = room;
+    r.startDate = QDate::fromString(startDate, "yyyy-MM-dd");
+    r.startTime = QTime::fromString(startTime, "HH:mm");
+    r.endTime = QTime::fromString(endTime, "HH:mm");
+    r.endDate = QDate::fromString(endDate, "yyyy-MM-dd");
+    // r.frequency = frequency.toInt();
+    // r.byWeekday = byWeekday.toInt();
+    r.overwriteable = isOverwriteable;
 
-    if (query.exec()) {
-        // Grab the actual ID the database assigned it
-        QString newId = query.lastInsertId().toString();
+    auto result = Database::Reservation::insert(r);
 
-        // 2. ADD TO VISUAL TABLE
-        int newRow = ui->reservationTable->rowCount();
-        ui->reservationTable->insertRow(newRow);
+    if (result) {
+        const Database::Reservation &created = *result;
 
-        ui->reservationTable->setItem(newRow, 0, new QTableWidgetItem(newId)); // Hidden ID
-        ui->reservationTable->setItem(newRow, 1, new QTableWidgetItem(resName));
-        ui->reservationTable->setItem(newRow, 2, new QTableWidgetItem(room));
-        ui->reservationTable->setItem(newRow, 3, new QTableWidgetItem(startDate));
-        ui->reservationTable->setItem(newRow, 4, new QTableWidgetItem(startTime));
-        ui->reservationTable->setItem(newRow, 5, new QTableWidgetItem(endTime));
-        ui->reservationTable->setItem(newRow, 6, new QTableWidgetItem(endDate));
-        ui->reservationTable->setItem(newRow, 7, new QTableWidgetItem(recurrence));
-        ui->reservationTable->setItem(newRow, 8, new QTableWidgetItem(isOverwriteable ? "Yes" : "No"));
+        int row = ui->reservationTable->rowCount();
+        ui->reservationTable->insertRow(row);
+
+        ui->reservationTable->setItem(row, 0, new QTableWidgetItem(QString::number(created.id)));
+        ui->reservationTable->setItem(row, 1, new QTableWidgetItem(created.name));
+        ui->reservationTable->setItem(row, 2, new QTableWidgetItem(created.room));
+        ui->reservationTable->setItem(row, 3, new QTableWidgetItem(created.startDate.toString()));
+        ui->reservationTable->setItem(row, 4, new QTableWidgetItem(created.startTime.toString()));
+        ui->reservationTable->setItem(row, 5, new QTableWidgetItem(created.endTime.toString()));
+        ui->reservationTable->setItem(row, 6, new QTableWidgetItem(created.endDate.toString()));
+        // ui->reservationTable->setItem(row, 7, new QTableWidgetItem(QString::number(created.recurrence)));
+        ui->reservationTable->setItem(row, 8, new QTableWidgetItem(created.overwriteable ? "Yes" : "No"));
 
         QMessageBox::information(this, "Success", "Reservation created!");
         ui->resNameInput->clear();
@@ -341,30 +355,27 @@ void HomeWindow::on_btnEditReservation_clicked()
         QString newOverwriteUI = editPopup.getUpdatedOverwriteable() ? "Yes" : "No";
 
         // 1. UPDATE THE DATABASE
-        QSqlQuery query;
-        query.prepare("UPDATE reservations SET name = :name, room = :room, start_date = :start_date, "
-                      "start_time = :start_time, end_time = :end_time, end_date = :end_date, "
-                      "recurrence = :recurrence, overwriteable = :overwriteable WHERE id = :id");
-        query.bindValue(":name", newName);
-        query.bindValue(":room", newRoom);
-        query.bindValue(":start_date", newDate);
-        query.bindValue(":start_time", newStart);
-        query.bindValue(":end_time", newEnd);
-        query.bindValue(":end_date", newEndDate);
-        query.bindValue(":recurrence", newRecurrence);
-        query.bindValue(":overwriteable", newOverwriteDb);
-        query.bindValue(":id", resId);
+        Database::Reservation r;
+        r.id = resId.toInt();
+        r.name = newName;
+        r.room = newRoom;
+        r.startDate = QDate::fromString(newDate, "yyyy-MM-dd");
+        r.startTime = QTime::fromString(newStart, "HH:mm");
+        r.endTime = QTime::fromString(newEnd, "HH:mm");
+        r.endDate = QDate::fromString(newEndDate, "yyyy-MM-dd");
+        // r.frequency = newRecurrence.toInt();
+        // r.byWeekday = newRecurrence.toInt();
+        r.overwriteable = (newOverwriteDb == 1);
 
-        if (query.exec()) {
-            // 2. UPDATE THE VISUAL TABLE
-            ui->reservationTable->item(currentRow, 1)->setText(newName);
-            ui->reservationTable->item(currentRow, 2)->setText(newRoom);
-            ui->reservationTable->item(currentRow, 3)->setText(newDate);
-            ui->reservationTable->item(currentRow, 4)->setText(newStart);
-            ui->reservationTable->item(currentRow, 5)->setText(newEnd);
-            ui->reservationTable->item(currentRow, 6)->setText(newEndDate);
-            ui->reservationTable->item(currentRow, 7)->setText(newRecurrence);
-            ui->reservationTable->item(currentRow, 8)->setText(newOverwriteUI);
+        if (Database::Reservation::update(r)) {
+            ui->reservationTable->item(currentRow, 1)->setText(r.name);
+            ui->reservationTable->item(currentRow, 2)->setText(r.room);
+            ui->reservationTable->item(currentRow, 3)->setText(r.startDate.toString());
+            ui->reservationTable->item(currentRow, 4)->setText(r.startTime.toString());
+            ui->reservationTable->item(currentRow, 5)->setText(r.endTime.toString());
+            ui->reservationTable->item(currentRow, 6)->setText(r.endDate.toString());
+            // ui->reservationTable->item(currentRow, 7)->setText(QString::number(r.recurrence));
+            ui->reservationTable->item(currentRow, 8)->setText(r.overwriteable ? "Yes" : "No");
 
             QMessageBox::information(this, "Success", "Reservation updated successfully!");
             applyFilters();

@@ -45,6 +45,7 @@ private:
     QSqlDatabase db;
     bool setupDatabase();
     void loadRoomsFromDatabase();
+    void extracted(QList<Database::Reservation> &reservations);
     void loadReservationsFromDatabase();
 
     // Helper Functions
