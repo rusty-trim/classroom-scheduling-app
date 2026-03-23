@@ -91,7 +91,8 @@ bool Database::Reservation::update(const Reservation &r)
         "start_time = :start_time, "
         "end_time = :end_time, "
         "end_date = :end_date, "
-        "recurrence = :recurrence, "
+        "frequency = :frequency, "
+        "by_weekday :by_weekday, "
         "overwriteable = :overwriteable "
         "WHERE id = :id"
         );
