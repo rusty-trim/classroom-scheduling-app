@@ -50,7 +50,6 @@ private:
     void loadReservationsFromDatabase();
 
     // Helper Functions
-    void populateTimeComboBoxes();
     void applyFilters();
 };
 
