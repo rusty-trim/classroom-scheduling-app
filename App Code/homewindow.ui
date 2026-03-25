@@ -284,12 +284,15 @@ QTabBar::tab {
               </widget>
              </item>
              <item row="3" column="1">
-              <widget class="QComboBox" name="startTimeComboBox">
+              <widget class="QTimeEdit" name="startTimeEdit">
                <property name="minimumSize">
                 <size>
                  <width>0</width>
                  <height>30</height>
                 </size>
+               </property>
+               <property name="displayFormat">
+                <string>hh:mm AP</string>
                </property>
               </widget>
              </item>
@@ -321,24 +324,27 @@ QTabBar::tab {
               </widget>
              </item>
              <item row="5" column="1">
-              <widget class="QComboBox" name="endTimeComboBox">
+              <widget class="QTimeEdit" name="endTimeEdit">
                <property name="minimumSize">
                 <size>
                  <width>0</width>
                  <height>30</height>
                 </size>
                </property>
+               <property name="displayFormat">
+                <string>hh:mm AP</string>
+               </property>
               </widget>
              </item>
              <item row="6" column="0">
-              <widget class="QLabel" name="label_recurrence">
+              <widget class="QLabel" name="label_frequency">
                <property name="text">
-                <string>Recurrence:</string>
+                <string>Frequency:</string>
                </property>
               </widget>
              </item>
              <item row="6" column="1">
-              <widget class="QComboBox" name="recurrenceComboBox">
+              <widget class="QComboBox" name="frequencyComboBox">
                <property name="minimumSize">
                 <size>
                  <width>0</width>
@@ -372,14 +378,32 @@ QTabBar::tab {
                </item>
               </widget>
              </item>
-             <item row="7" column="1">
+             
+             <item row="7" column="0" colspan="2">
+              <widget class="QGroupBox" name="weekdayGroupBox">
+               <property name="title">
+                <string>Repeat on Days:</string>
+               </property>
+               <layout class="QHBoxLayout" name="weekdayLayout">
+                <item><widget class="QCheckBox" name="chkMon"><property name="text"><string>Mon</string></property></widget></item>
+                <item><widget class="QCheckBox" name="chkTue"><property name="text"><string>Tue</string></property></widget></item>
+                <item><widget class="QCheckBox" name="chkWed"><property name="text"><string>Wed</string></property></widget></item>
+                <item><widget class="QCheckBox" name="chkThu"><property name="text"><string>Thu</string></property></widget></item>
+                <item><widget class="QCheckBox" name="chkFri"><property name="text"><string>Fri</string></property></widget></item>
+                <item><widget class="QCheckBox" name="chkSat"><property name="text"><string>Sat</string></property></widget></item>
+                <item><widget class="QCheckBox" name="chkSun"><property name="text"><string>Sun</string></property></widget></item>
+               </layout>
+              </widget>
+             </item>
+             <item row="8" column="1">
               <widget class="QCheckBox" name="overwriteCheckBox">
                <property name="text">
                 <string>Can be overwritten by other reservations</string>
                </property>
               </widget>
              </item>
-             <item row="8" column="1">
+             
+             <item row="9" column="1">
               <widget class="QPushButton" name="btnCreateReservation">
                <property name="minimumSize">
                 <size>
@@ -507,7 +531,12 @@ QTabBar::tab {
                </column>
                <column>
                 <property name="text">
-                 <string>Recurrence</string>
+                 <string>Frequency</string>
+                </property>
+               </column>
+               <column>
+                <property name="text">
+                 <string>Days</string>
                 </property>
                </column>
                <column>
