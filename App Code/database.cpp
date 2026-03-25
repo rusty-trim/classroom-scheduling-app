@@ -6,7 +6,7 @@
 #include <QSqlQuery>
 #include "database.h"
 
- bool Database::Reservation::create()
+bool Database::Reservation::create()
 {
     QSqlQuery query;
 
@@ -20,7 +20,7 @@
                       "end_date TEXT, "
                       "frequency INTEGER, "
                       "by_weekday INTEGER, "
-                      "overwritable INTEGER)"); // SQLite uses 1 for True, 0 for False
+                      "overwriteable INTEGER)"); // SQLite uses 1 for True, 0 for False
 }
 
 std::optional<Database::Reservation> Database::Reservation::insert(const Reservation &r)
@@ -83,35 +83,33 @@ QList<Database::Reservation> Database::Reservation::retrieve()
 bool Database::Reservation::update(const Reservation &r)
 {
     QSqlQuery query;
-    query.prepare(
-        "UPDATE reservations SET "
-        "name = :name, "
-        "room = :room, "
-        "start_date = :start_date, "
-        "start_time = :start_time, "
-        "end_time = :end_time, "
-        "end_date = :end_date, "
-        "frequency = :frequency, "
-        "by_weekday :by_weekday, "
-        "overwriteable = :overwriteable "
-        "WHERE id = :id"
-        );
+    query.prepare("UPDATE reservations SET "
+                  "name = :name, room = :room, start_date = :start_date, "
+                  "start_time = :start_time, end_time = :end_time, "
+                  "end_date = :end_date, frequency = :frequency, "
+                  "by_weekday = :by_weekday, "
+                  "overwriteable = :overwriteable "
+                  "WHERE id = :id");
 
     query.bindValue(":name", r.name);
     query.bindValue(":room", r.room);
+    
+    // FIX: Convert QDate/QTime to formatted strings so SQLite accepts them
     query.bindValue(":start_date", r.startDate.toString("yyyy-MM-dd"));
     query.bindValue(":start_time", r.startTime.toString("HH:mm"));
     query.bindValue(":end_time", r.endTime.toString("HH:mm"));
     query.bindValue(":end_date", r.endDate.toString("yyyy-MM-dd"));
+    
     query.bindValue(":frequency", r.frequency);
     query.bindValue(":by_weekday", r.byWeekday);
     query.bindValue(":overwriteable", r.overwriteable ? 1 : 0);
     query.bindValue(":id", r.id);
 
-    if (!query.exec())
+    if (!query.exec()) {
         return false;
-
-    return query.numRowsAffected() > 0;
+    }
+    
+    return query.numRowsAffected() > 0; 
 }
 
 void Database::Reservation::remove()
