@@ -3,6 +3,7 @@
 
 #include <QDialog>
 #include <QDate>
+#include <QTime>
 
 namespace Ui { class EditDialog; }
 
@@ -14,21 +15,20 @@ public:
     explicit EditDialog(QWidget *parent = nullptr);
     ~EditDialog();
 
-    // Removed the 'id' parameter from this list
-    void setReservationData(const QString &name, const QString &room, const QDate &date, const QString &startTime, const QString &endTime, const QString &recurrence, const QDate &endDate, bool isOverwriteable);
+    void setReservationData(const QString &name, const QString &room, const QDate &date, const QTime &startTime, const QTime &endTime, const QString &frequency, const QDate &endDate, bool isOverwriteable, int byWeekday);
 
     QString getUpdatedName() const;
     QString getUpdatedRoom() const;
     QDate getUpdatedDate() const;
-    QString getUpdatedStartTime() const;
-    QString getUpdatedEndTime() const;
-    QString getUpdatedRecurrence() const;
+    QTime getUpdatedStartTime() const;
+    QTime getUpdatedEndTime() const;
+    QString getUpdatedFrequency() const;
     QDate getUpdatedEndDate() const;
     bool getUpdatedOverwriteable() const;
+    int getUpdatedByWeekday() const;
 
 private:
     Ui::EditDialog *ui;
-    void populateTimeComboBoxes();
 };
 
 #endif // EDITDIALOG_H
