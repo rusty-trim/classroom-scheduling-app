@@ -28,6 +28,23 @@
 
 #include "database.h"
 
+// Helper function to convert bitmask to readable days
+QString getDaysString(int byWeekday) {
+    if (byWeekday == 0) return "Does not repeat";
+    if (byWeekday == 127) return "Everyday";
+    
+    QStringList days;
+    if (byWeekday & 1) days << "Mon";
+    if (byWeekday & 2) days << "Tue";
+    if (byWeekday & 4) days << "Wed";
+    if (byWeekday & 8) days << "Thu";
+    if (byWeekday & 16) days << "Fri";
+    if (byWeekday & 32) days << "Sat";
+    if (byWeekday & 64) days << "Sun";
+    
+    return days.join(", ");
+}
+
 //this function catches the clicks or taps from the user to skip animation
 namespace {
 class AnimSkipFilter : public QObject {
@@ -55,16 +72,40 @@ HomeWindow::HomeWindow(QWidget *parent)
 {
     ui->setupUi(this);
 
+    // --- NEW DAY CHECKBOX LOGIC START ---
+    // 1. Disable the days group box by default when the app opens
+    ui->weekdayGroupBox->setEnabled(false);
+
+    // 2. Listen for changes in the Frequency Dropdown
+    connect(ui->frequencyComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [=](int index){
+        bool repeats = (index != 0); // True if it's NOT "Does not repeat"
+        
+        // Enable or disable the whole box
+        ui->weekdayGroupBox->setEnabled(repeats);
+        
+        // If disabled, uncheck all the boxes to keep the database data clean
+        if (!repeats) {
+            ui->chkMon->setChecked(false);
+            ui->chkTue->setChecked(false);
+            ui->chkWed->setChecked(false);
+            ui->chkThu->setChecked(false);
+            ui->chkFri->setChecked(false);
+            ui->chkSat->setChecked(false);
+            ui->chkSun->setChecked(false);
+        }
+    });
+    // --- NEW DAY CHECKBOX LOGIC END ---
+
+
     // Force the app to always open on the first tab (Welcome / Rooms)
     ui->tabWidget->setCurrentIndex(0);
 
-    // 1. Setup Database First
+    // Setup Database First
     if (!setupDatabase()) {
         QMessageBox::critical(this, "Database Error", "Failed to connect to the database. Your data will not be saved.");
     }
 
-    populateTimeComboBoxes();
-
+    // Set Default Dates
     ui->startDateEdit->setDate(QDate::currentDate());
     ui->endDateEdit->setDate(QDate::currentDate());
     ui->scheduleDateEdit->setDate(QDate::currentDate());
@@ -73,8 +114,9 @@ HomeWindow::HomeWindow(QWidget *parent)
     ui->filterRoomComboBox->addItem("All Rooms");
     ui->filterDateEdit->setEnabled(false);
 
-    ui->reservationTable->setColumnCount(9);
-    ui->reservationTable->setHorizontalHeaderLabels({"ID", "Name", "Room", "Start Date", "Start Time", "End Time", "End Date", "Recurrence", "Overwriteable"});
+    // Setup Table
+    ui->reservationTable->setColumnCount(10);
+    ui->reservationTable->setHorizontalHeaderLabels({"ID", "Name", "Room", "Start Date", "Start Time", "End Time", "End Date", "Frequency", "Days", "Overwriteable"});
 
     ui->reservationTable->hideColumn(0); // Hide Database ID
     ui->reservationTable->setSelectionBehavior(QAbstractItemView::SelectRows);
@@ -91,7 +133,7 @@ HomeWindow::HomeWindow(QWidget *parent)
     ui->reservationTable->setColumnWidth(7, 130);
     ui->reservationTable->setColumnWidth(8, 110);
 
-    // 2. Load Existing Data from Database into the UI
+    // Load Existing Data from Database into the UI
     loadRoomsFromDatabase();
     loadReservationsFromDatabase();
 
@@ -149,55 +191,40 @@ void HomeWindow::loadRoomsFromDatabase()
 
 void HomeWindow::loadReservationsFromDatabase()
 {
-    // QSqlQuery query("SELECT id, name, room, start_date, start_time, end_time, end_date, recurrence, overwriteable FROM reservations");
-    // while (query.next()) {
-    //     int newRow = ui->reservationTable->rowCount();
-    //     ui->reservationTable->insertRow(newRow);
+    ui->reservationTable->setColumnCount(10);
+    ui->reservationTable->setHorizontalHeaderLabels({"ID", "Name", "Room", "Start Date", "Start Time", "End Time", "End Date", "Frequency", "Days", "Overwriteable"});
 
-    //     ui->reservationTable->setItem(newRow, 0, new QTableWidgetItem(query.value(0).toString())); // ID
-    //     ui->reservationTable->setItem(newRow, 1, new QTableWidgetItem(query.value(1).toString())); // Name
-    //     ui->reservationTable->setItem(newRow, 2, new QTableWidgetItem(query.value(2).toString())); // Room
-    //     ui->reservationTable->setItem(newRow, 3, new QTableWidgetItem(query.value(3).toString())); // Start Date
-    //     ui->reservationTable->setItem(newRow, 4, new QTableWidgetItem(query.value(4).toString())); // Start Time
-    //     ui->reservationTable->setItem(newRow, 5, new QTableWidgetItem(query.value(5).toString())); // End Time
-    //     ui->reservationTable->setItem(newRow, 6, new QTableWidgetItem(query.value(6).toString())); // End Date
-    //     ui->reservationTable->setItem(newRow, 7, new QTableWidgetItem(query.value(7).toString())); // Recurrence
+    // Fetch all reservations from the database
+    QList<Database::Reservation> reservations = Database::Reservation::retrieve();
 
-    //     bool isOverwriteable = query.value(8).toInt() == 1;
-    //     ui->reservationTable->setItem(newRow, 8, new QTableWidgetItem(isOverwriteable ? "Yes" : "No")); // Overwriteable
-    // }
+    // CRITICAL FIX: Force the visual table to perfectly match the database size.
+    // This entirely prevents old rows from stacking up on the screen!
+    ui->reservationTable->setRowCount(reservations.size());
 
-    auto reservations = Database::Reservation::retrieve();
-
-    for (const auto &r : reservations) {
-        int row = ui->reservationTable->rowCount();
-        ui->reservationTable->insertRow(row);
+    for (int row = 0; row < reservations.size(); ++row) {
+        const Database::Reservation &r = reservations[row];
 
         ui->reservationTable->setItem(row, 0, new QTableWidgetItem(QString::number(r.id)));
         ui->reservationTable->setItem(row, 1, new QTableWidgetItem(r.name));
         ui->reservationTable->setItem(row, 2, new QTableWidgetItem(r.room));
-        ui->reservationTable->setItem(row, 3, new QTableWidgetItem(r.startDate.toString()));
-        ui->reservationTable->setItem(row, 4, new QTableWidgetItem(r.startTime.toString()));
-        ui->reservationTable->setItem(row, 5, new QTableWidgetItem(r.endTime.toString()));
-        ui->reservationTable->setItem(row, 6, new QTableWidgetItem(r.endDate.toString()));
-        // ui->reservationTable->setItem(row, 7, new QTableWidgetItem(QString::number(r.recurrence)));
-        ui->reservationTable->setItem(row, 8, new QTableWidgetItem(r.overwriteable ? "Yes" : "No"));
+        ui->reservationTable->setItem(row, 3, new QTableWidgetItem(r.startDate.toString("MM/dd/yyyy")));
+        ui->reservationTable->setItem(row, 4, new QTableWidgetItem(r.startTime.toString("hh:mm AP")));
+        ui->reservationTable->setItem(row, 5, new QTableWidgetItem(r.endTime.toString("hh:mm AP")));
+        ui->reservationTable->setItem(row, 6, new QTableWidgetItem(r.endDate.toString("MM/dd/yyyy")));
+        
+        QString freqText = "Does not repeat";
+        if (r.frequency == 1) freqText = "Everyday";
+        else if (r.frequency == 2) freqText = "Every Week";
+        else if (r.frequency == 3) freqText = "Every Month";
+        else if (r.frequency == 4) freqText = "Every Year";
+        ui->reservationTable->setItem(row, 7, new QTableWidgetItem(freqText));
+        
+        QString daysStr = getDaysString(r.byWeekday);
+        ui->reservationTable->setItem(row, 8, new QTableWidgetItem(daysStr));
+        ui->reservationTable->setItem(row, 9, new QTableWidgetItem(r.overwriteable ? "Yes" : "No"));
     }
 }
 
-void HomeWindow::populateTimeComboBoxes()
-{
-    ui->startTimeComboBox->clear();
-    ui->endTimeComboBox->clear();
-
-    QTime time(0, 0);
-    for (int i = 0; i < 48; ++i) {
-        QString timeString = time.toString("hh:mm AP");
-        ui->startTimeComboBox->addItem(timeString);
-        ui->endTimeComboBox->addItem(timeString);
-        time = time.addSecs(30 * 60);
-    }
-}
 
 // --- ROOM MANAGEMENT ---
 
@@ -267,164 +294,236 @@ void HomeWindow::on_btnDeleteRoom_clicked()
 
 void HomeWindow::on_btnCreateReservation_clicked()
 {
+    // 1. Gather basic info directly from the widgets
     QString resName = ui->resNameInput->text();
     QString room = ui->roomComboBox->currentText();
-    QString startDate = ui->startDateEdit->date().toString("MM/dd/yyyy");
-    QString startTime = ui->startTimeComboBox->currentText();
-    QString endTime = ui->endTimeComboBox->currentText();
-    QString endDate = ui->endDateEdit->date().toString("MM/dd/yyyy");
-    // QString recurrence = ui->recurrenceComboBox->currentText();
+    
+    // Grab the dates and times directly as objects!
+    QDate startDate = ui->startDateEdit->date();
+    QDate endDate = ui->endDateEdit->date();
+    
+    // --> THESE ARE THE CRITICAL FIXES <--
+    QTime startTime = ui->startTimeEdit->time(); 
+    QTime endTime = ui->endTimeEdit->time();     
+    
+    int frequencyIndex = ui->frequencyComboBox->currentIndex(); 
+    QString frequencyStr = ui->frequencyComboBox->currentText(); 
     bool isOverwriteable = ui->overwriteCheckBox->isChecked();
-    int dbOverwriteable = isOverwriteable ? 1 : 0; // Convert to int for DB
 
     if (resName.isEmpty() || room.isEmpty()) {
         QMessageBox::warning(this, "Missing Info", "Please provide a room and reservation name.");
         return;
     }
 
-    // 1. SAVE TO DATABASE
+    // 2. Build the weekday bitmask
+    int weekdayMask = 0;
+    if (ui->chkMon->isChecked()) weekdayMask |= 1;
+    if (ui->chkTue->isChecked()) weekdayMask |= 2;
+    if (ui->chkWed->isChecked()) weekdayMask |= 4;
+    if (ui->chkThu->isChecked()) weekdayMask |= 8;
+    if (ui->chkFri->isChecked()) weekdayMask |= 16;
+    if (ui->chkSat->isChecked()) weekdayMask |= 32;
+    if (ui->chkSun->isChecked()) weekdayMask |= 64;
+
+    // 3. Save to Reservation Object
     Database::Reservation r;
     r.name = resName;
     r.room = room;
-    r.startDate = QDate::fromString(startDate, "yyyy-MM-dd");
-    r.startTime = QTime::fromString(startTime, "HH:mm");
-    r.endTime = QTime::fromString(endTime, "HH:mm");
-    r.endDate = QDate::fromString(endDate, "yyyy-MM-dd");
-    // r.frequency = frequency.toInt();
-    // r.byWeekday = byWeekday.toInt();
+    r.startDate = startDate;
+    r.startTime = startTime;
+    r.endTime = endTime;
+    r.endDate = endDate;
+    r.frequency = frequencyIndex;
+    r.byWeekday = weekdayMask;
     r.overwriteable = isOverwriteable;
 
-    auto result = Database::Reservation::insert(r);
+    // 4. Show the Confirmation Pop-up
+    QString daysStr = getDaysString(r.byWeekday);
+    QString confirmMsg = QString("Are you sure you want to create the following reservation?\n\n"
+                                 "Name: %1\n"
+                                 "Room: %2\n"
+                                 "Start: %3 at %4\n"
+                                 "End: %5 at %6\n"
+                                 "Frequency: %7\n"
+                                 "Days: %8\n"
+                                 "Overwriteable: %9")
+                             .arg(r.name)
+                             .arg(r.room)
+                             .arg(r.startDate.toString("MM/dd/yyyy"))
+                             .arg(r.startTime.toString("hh:mm AP"))
+                             .arg(r.endDate.toString("MM/dd/yyyy"))
+                             .arg(r.endTime.toString("hh:mm AP"))
+                             .arg(frequencyStr)
+                             .arg(daysStr)
+                             .arg(r.overwriteable ? "Yes" : "No");
 
-    if (result) {
-        const Database::Reservation &created = *result;
+    QMessageBox::StandardButton reply = QMessageBox::question(this, "Confirm Reservation", confirmMsg, QMessageBox::Yes | QMessageBox::No);
 
-        int row = ui->reservationTable->rowCount();
-        ui->reservationTable->insertRow(row);
+    // 5. Insert into Database if user clicks "Yes"
+    if (reply == QMessageBox::Yes) {
+        auto result = Database::Reservation::insert(r);
 
-        ui->reservationTable->setItem(row, 0, new QTableWidgetItem(QString::number(created.id)));
-        ui->reservationTable->setItem(row, 1, new QTableWidgetItem(created.name));
-        ui->reservationTable->setItem(row, 2, new QTableWidgetItem(created.room));
-        ui->reservationTable->setItem(row, 3, new QTableWidgetItem(created.startDate.toString()));
-        ui->reservationTable->setItem(row, 4, new QTableWidgetItem(created.startTime.toString()));
-        ui->reservationTable->setItem(row, 5, new QTableWidgetItem(created.endTime.toString()));
-        ui->reservationTable->setItem(row, 6, new QTableWidgetItem(created.endDate.toString()));
-        // ui->reservationTable->setItem(row, 7, new QTableWidgetItem(QString::number(created.recurrence)));
-        ui->reservationTable->setItem(row, 8, new QTableWidgetItem(created.overwriteable ? "Yes" : "No"));
+        if (result.has_value()) { 
+            QMessageBox::information(this, "Success", "Reservation successfully created!");
+            
+            // Clear the form fields back to defaults
+            ui->resNameInput->clear();
+            ui->startDateEdit->setDate(QDate::currentDate());
+            ui->endDateEdit->setDate(QDate::currentDate());
+            
+            // Reset times back to a default (e.g., midnight)
+            ui->startTimeEdit->setTime(QTime(0, 0));
+            ui->endTimeEdit->setTime(QTime(0, 0));
+            
+            ui->frequencyComboBox->setCurrentIndex(0); // This will automatically uncheck the days!
+            ui->overwriteCheckBox->setChecked(false);
 
-        QMessageBox::information(this, "Success", "Reservation created!");
-        ui->resNameInput->clear();
-        applyFilters();
-    } else {
-        QMessageBox::critical(this, "Error", "Failed to save reservation to database.");
+            // Refresh the table perfectly by reloading the database
+            loadReservationsFromDatabase(); 
+            
+        } else {
+            QMessageBox::critical(this, "Error", "Failed to save reservation to database.");
+        }
     }
 }
 
 void HomeWindow::on_btnEditReservation_clicked()
 {
-    int currentRow = ui->reservationTable->currentRow();
-    if (currentRow < 0) {
-        QMessageBox::warning(this, "Select Reservation", "Please click on a reservation in the table to edit it.");
+    int selectedRow = ui->reservationTable->currentRow();
+    if (selectedRow < 0) {
+        QMessageBox::warning(this, "No Selection", "Please select a reservation to edit.");
         return;
     }
 
-    QString resId = ui->reservationTable->item(currentRow, 0)->text();
-    QString currentName = ui->reservationTable->item(currentRow, 1)->text();
-    QString currentRoom = ui->reservationTable->item(currentRow, 2)->text();
-    QDate currentDate = QDate::fromString(ui->reservationTable->item(currentRow, 3)->text(), "MM/dd/yyyy");
-    QString currentStart = ui->reservationTable->item(currentRow, 4)->text();
-    QString currentEnd = ui->reservationTable->item(currentRow, 5)->text();
-    QDate currentEndDate = QDate::fromString(ui->reservationTable->item(currentRow, 6)->text(), "MM/dd/yyyy");
-    QString currentRecurrence = ui->reservationTable->item(currentRow, 7)->text();
-    bool currentOverwriteable = (ui->reservationTable->item(currentRow, 8)->text() == "Yes");
+    // 1. Grab the critical ID from the hidden column 0
+    int resId = ui->reservationTable->item(selectedRow, 0)->text().toInt();
 
+    // 2. Grab the rest of the data to pre-fill the Edit Popup
+    QString name = ui->reservationTable->item(selectedRow, 1)->text();
+    QString room = ui->reservationTable->item(selectedRow, 2)->text();
+    QDate startDate = QDate::fromString(ui->reservationTable->item(selectedRow, 3)->text(), "MM/dd/yyyy");
+    QTime startTime = QTime::fromString(ui->reservationTable->item(selectedRow, 4)->text(), "hh:mm AP");
+    QTime endTime = QTime::fromString(ui->reservationTable->item(selectedRow, 5)->text(), "hh:mm AP");
+    QDate endDate = QDate::fromString(ui->reservationTable->item(selectedRow, 6)->text(), "MM/dd/yyyy");
+    QString freqText = ui->reservationTable->item(selectedRow, 7)->text();
+    QString daysStr = ui->reservationTable->item(selectedRow, 8)->text();
+    bool isOverwriteable = (ui->reservationTable->item(selectedRow, 9)->text() == "Yes");
+
+    // Reverse-engineer the days string back into the integer bitmask for the checkboxes
+    int byWeekday = 0;
+    if (daysStr == "Everyday") byWeekday = 127;
+    else {
+        if (daysStr.contains("Mon")) byWeekday |= 1;
+        if (daysStr.contains("Tue")) byWeekday |= 2;
+        if (daysStr.contains("Wed")) byWeekday |= 4;
+        if (daysStr.contains("Thu")) byWeekday |= 8;
+        if (daysStr.contains("Fri")) byWeekday |= 16;
+        if (daysStr.contains("Sat")) byWeekday |= 32;
+        if (daysStr.contains("Sun")) byWeekday |= 64;
+    }
+
+    // 3. Open the Dialog
     EditDialog editPopup(this);
-    editPopup.setReservationData(currentName, currentRoom, currentDate, currentStart, currentEnd, currentRecurrence, currentEndDate, currentOverwriteable);
+    editPopup.setReservationData(name, room, startDate, startTime, endTime, freqText, endDate, isOverwriteable, byWeekday);
 
+    // 4. If the user clicks "OK" on the Edit window
     if (editPopup.exec() == QDialog::Accepted) {
 
-        // Grab the new data from the popup
-        QString newName = editPopup.getUpdatedName();
-        QString newRoom = editPopup.getUpdatedRoom();
-        QString newDate = editPopup.getUpdatedDate().toString("MM/dd/yyyy");
-        QString newStart = editPopup.getUpdatedStartTime();
-        QString newEnd = editPopup.getUpdatedEndTime();
-        QString newEndDate = editPopup.getUpdatedEndDate().toString("MM/dd/yyyy");
-        QString newRecurrence = editPopup.getUpdatedRecurrence();
-        int newOverwriteDb = editPopup.getUpdatedOverwriteable() ? 1 : 0;
-        QString newOverwriteUI = editPopup.getUpdatedOverwriteable() ? "Yes" : "No";
-
-        // 1. UPDATE THE DATABASE
         Database::Reservation r;
-        r.id = resId.toInt();
-        r.name = newName;
-        r.room = newRoom;
-        r.startDate = QDate::fromString(newDate, "yyyy-MM-dd");
-        r.startTime = QTime::fromString(newStart, "HH:mm");
-        r.endTime = QTime::fromString(newEnd, "HH:mm");
-        r.endDate = QDate::fromString(newEndDate, "yyyy-MM-dd");
-        // r.frequency = newRecurrence.toInt();
-        // r.byWeekday = newRecurrence.toInt();
-        r.overwriteable = (newOverwriteDb == 1);
+        r.id = resId; // <--- This is what connects the update to the correct database row!
+        r.name = editPopup.getUpdatedName();
+        r.room = editPopup.getUpdatedRoom();
+        r.startDate = editPopup.getUpdatedDate();
+        r.startTime = editPopup.getUpdatedStartTime();
+        r.endTime = editPopup.getUpdatedEndTime();
+        r.endDate = editPopup.getUpdatedEndDate();
+        r.byWeekday = editPopup.getUpdatedByWeekday();
+        r.overwriteable = editPopup.getUpdatedOverwriteable();
 
-        if (Database::Reservation::update(r)) {
-            ui->reservationTable->item(currentRow, 1)->setText(r.name);
-            ui->reservationTable->item(currentRow, 2)->setText(r.room);
-            ui->reservationTable->item(currentRow, 3)->setText(r.startDate.toString());
-            ui->reservationTable->item(currentRow, 4)->setText(r.startTime.toString());
-            ui->reservationTable->item(currentRow, 5)->setText(r.endTime.toString());
-            ui->reservationTable->item(currentRow, 6)->setText(r.endDate.toString());
-            // ui->reservationTable->item(currentRow, 7)->setText(QString::number(r.recurrence));
-            ui->reservationTable->item(currentRow, 8)->setText(r.overwriteable ? "Yes" : "No");
+        // Convert the string frequency from the dropdown back to an integer for SQLite
+        QString updatedFreqText = editPopup.getUpdatedFrequency();
+        if (updatedFreqText == "Does not repeat") r.frequency = 0;
+        else if (updatedFreqText == "Everyday") r.frequency = 1;
+        else if (updatedFreqText == "Every Week") r.frequency = 2;
+        else if (updatedFreqText == "Every Month") r.frequency = 3;
+        else if (updatedFreqText == "Every Year") r.frequency = 4;
+        else r.frequency = 0;
 
-            QMessageBox::information(this, "Success", "Reservation updated successfully!");
-            applyFilters();
-        } else {
-            QMessageBox::critical(this, "Error", "Failed to update reservation in database.");
+        // 5. Show Final Confirmation Pop-up
+        QMessageBox::StandardButton reply = QMessageBox::question(this, "Confirm Edit",
+                                                                  "Are you sure you want to save these changes?",
+                                                                  QMessageBox::Yes | QMessageBox::No);
+
+        // 6. Save to Database
+        if (reply == QMessageBox::Yes) {
+            if (Database::Reservation::update(r)) {
+                QMessageBox::information(this, "Success", "Reservation successfully updated.");
+                loadReservationsFromDatabase(); // Refresh the table to show the changes
+            } else {
+                QMessageBox::critical(this, "Error", "Failed to update reservation in the database.");
+            }
         }
     }
 }
 
 void HomeWindow::on_btnDeleteReservation_clicked()
 {
-    int currentRow = ui->reservationTable->currentRow();
-    if (currentRow < 0) {
-        QMessageBox::warning(this, "Select Reservation", "Please click on a reservation in the table to delete it.");
+    // 1. Check if the user actually clicked on a row
+    int selectedRow = ui->reservationTable->currentRow();
+    if (selectedRow < 0) {
+        QMessageBox::warning(this, "No Selection", "Please select a reservation to delete.");
         return;
     }
 
-    QString resId = ui->reservationTable->item(currentRow, 0)->text();
-    QString resName = ui->reservationTable->item(currentRow, 1)->text();
-    QString room = ui->reservationTable->item(currentRow, 2)->text();
-    QString startDate = ui->reservationTable->item(currentRow, 3)->text();
-    QString startTime = ui->reservationTable->item(currentRow, 4)->text();
-    QString endTime = ui->reservationTable->item(currentRow, 5)->text();
-    QString endDate = ui->reservationTable->item(currentRow, 6)->text();
-    QString recurrence = ui->reservationTable->item(currentRow, 7)->text();
-    QString overwriteText = ui->reservationTable->item(currentRow, 8)->text();
+    // 2. Safely grab ALL the data from the correct columns for the selected row
+    QString resId = ui->reservationTable->item(selectedRow, 0)->text();
+    QString resName = ui->reservationTable->item(selectedRow, 1)->text();
+    QString room = ui->reservationTable->item(selectedRow, 2)->text();
+    QString startDate = ui->reservationTable->item(selectedRow, 3)->text();
+    QString startTime = ui->reservationTable->item(selectedRow, 4)->text();
+    QString endTime = ui->reservationTable->item(selectedRow, 5)->text();
+    QString endDate = ui->reservationTable->item(selectedRow, 6)->text();
+    QString frequency = ui->reservationTable->item(selectedRow, 7)->text();
+    QString daysStr = ui->reservationTable->item(selectedRow, 8)->text();
+    QString overwriteable = ui->reservationTable->item(selectedRow, 9)->text();
 
-    QString summary = QString("Name: %1\nRoom: %2\nStart Date: %3\nTime: %4 to %5\nEnd Date: %6\nRecurrence: %7\nOverwriteable: %8")
-                          .arg(resName, room, startDate, startTime, endTime, endDate, recurrence, overwriteText);
+    // 3. Build the detailed confirmation message (matches the Create pop-up)
+    QString confirmMsg = QString("Are you sure you want to permanently delete this reservation?\n\n"
+                                 "Name: %1\n"
+                                 "Room: %2\n"
+                                 "Start: %3 at %4\n"
+                                 "End: %5 at %6\n"
+                                 "Frequency: %7\n"
+                                 "Days: %8\n"
+                                 "Overwriteable: %9")
+                             .arg(resName)
+                             .arg(room)
+                             .arg(startDate)
+                             .arg(startTime)
+                             .arg(endDate)
+                             .arg(endTime)
+                             .arg(frequency)
+                             .arg(daysStr)
+                             .arg(overwriteable);
 
-    QMessageBox::StandardButton reply = QMessageBox::question(this, "Confirm Deletion",
-                                                              "Are you sure you want to delete the following reservation? This cannot be undone.\n\n" + summary,
-                                                              QMessageBox::Yes | QMessageBox::Cancel);
+    // Show the pop-up
+    QMessageBox::StandardButton reply = QMessageBox::question(this, "Delete Reservation", confirmMsg,
+                                                              QMessageBox::Yes | QMessageBox::No);
 
+    // 4. Delete from the database if confirmed
     if (reply == QMessageBox::Yes) {
-        // DELETE FROM DATABASE
         QSqlQuery query;
         query.prepare("DELETE FROM reservations WHERE id = :id");
         query.bindValue(":id", resId);
 
         if (query.exec()) {
-            ui->reservationTable->removeRow(currentRow);
-            QMessageBox::information(this, "Deleted", "Reservation deleted!");
+            loadReservationsFromDatabase(); // Refresh the table so the deleted row disappears
+            QMessageBox::information(this, "Deleted", "Reservation successfully deleted.");
         } else {
-            QMessageBox::critical(this, "Error", "Failed to delete from database.");
+            QMessageBox::critical(this, "Error", "Failed to delete reservation from the database.");
         }
     }
 }
-
 // --- FILTERING LOGIC ---
 
 void HomeWindow::applyFilters()
