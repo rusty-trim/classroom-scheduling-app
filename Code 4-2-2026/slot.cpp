@@ -19,7 +19,7 @@ bool Database::Slot::create()
         "date TEXT, "
         "start_time TEXT, "
         "end_time TEXT, "
-        "notes TEXT, "
+        "overwriteable INTEGER, "
         "FOREIGN KEY (reservation_id) REFERENCES reservations(id)"
         ");"
         );
