@@ -20,35 +20,6 @@ bool Database::Reservation::create()
                       "overwriteable INTEGER)"); // SQLite uses 1 for True, 0 for False
 }
 
-// std::optional<Database::Reservation> Database::Reservation::insert(const Reservation &r)
-// {
-//     QSqlQuery query;
-//     query.prepare(
-//         "INSERT INTO reservations "
-//         "(name, room, start_date, start_time, end_time, end_date, frequency, by_weekday, overwriteable) "
-//         "VALUES (:name, :room, :start_date, :start_time, :end_time, :end_date, :frequency, :by_weekday, :overwriteable)"
-//         );
-
-//     query.bindValue(":name", r.name);
-//     query.bindValue(":room", r.room);
-//     query.bindValue(":start_date", r.startDate.toString("yyyy-MM-dd"));
-//     query.bindValue(":start_time", r.startTime.toString("HH:mm"));
-//     query.bindValue(":end_time", r.endTime.toString("HH:mm"));
-//     query.bindValue(":end_date", r.endDate.toString("yyyy-MM-dd"));
-//     query.bindValue(":frequency", r.frequency);
-//     query.bindValue(":by_weekday", r.byWeekday);
-//     query.bindValue(":overwriteable", r.overwriteable ? 1 : 0);
-
-//     if (!query.exec()) {
-//         return std::nullopt;
-//     }
-
-//     Reservation created = r;
-//     created.id = query.lastInsertId().toInt();
-
-//     return created;
-// }
-
 std::optional<Database::Reservation> Database::Reservation::insert(const Reservation &r)
 {
     QSqlQuery query;
@@ -76,7 +47,7 @@ std::optional<Database::Reservation> Database::Reservation::insert(const Reserva
     Reservation created = r;
     created.id = query.lastInsertId().toInt();
 
-           // Generate slots for this reservation
+           // No open transaction above this point, so Slot::insert() has a clean connection
     if (!Database::Slot::insert(
             created.id,
             r.room,
@@ -84,11 +55,17 @@ std::optional<Database::Reservation> Database::Reservation::insert(const Reserva
             r.endDate.toString("yyyy-MM-dd"),
             r.startTime.toString("HH:mm"),
             r.endTime.toString("HH:mm"),
+            r.frequency,
             r.byWeekday,
             r.overwriteable ? 1 : 0
             ))
     {
-        return std::nullopt; // rollback behavior could be improved
+        // Clean up the reservation since slots failed
+        QSqlQuery cleanup;
+        cleanup.prepare("DELETE FROM reservations WHERE id = :id");
+        cleanup.bindValue(":id", created.id);
+        cleanup.exec();
+        return std::nullopt;
     }
 
     return created;

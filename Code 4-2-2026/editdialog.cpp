@@ -59,6 +59,7 @@ void EditDialog::setReservationData(const QString &name, const QString &room, co
     ui->frequencyCombo->setCurrentText(frequency);
     
     ui->endDateEdit->setDate(endDate);
+    ui->overwriteableCheckBox->setChecked(isOverwriteable);
 
     // ONLY check the boxes if the event is actually a Weekly repeating event!
     if (frequency == "Every Week") {

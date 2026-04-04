@@ -56,6 +56,7 @@ class Slot
                        const QString& endDateStr,
                        const QString& startTime,
                        const QString& endTime,
+                       int frequency,    // Add this parameter
                        int byWeekday,         // bitmask: Mon=1<<0, Tue=1<<1, ..., Sun=1<<6
                        int overwriteable);
     static QList<Database::Slot> retrieve();

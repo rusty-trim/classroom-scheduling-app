@@ -29,6 +29,7 @@
 #include <QGraphicsRectItem>
 #include <QPrinter>
 #include <QPrintDialog>
+#include <iostream>
 
 #include "database.h"
 
@@ -232,6 +233,34 @@ bool HomeWindow::setupDatabase()
 
     if(!Database::Reservation::create())
         return false;
+
+    if(!Database::Slot::create())
+        return false;
+
+    QList<Database::Reservation> reservations = Database::Reservation::retrieve();
+
+    for (const Database::Reservation& reservation : reservations)
+    {
+        qDebug() << "---- RESERVATION DEBUG ----";
+        qDebug() << "id:" << reservation.id;
+        qDebug() << "roomId:" << reservation.room;
+        qDebug() << "frequency: " << reservation.frequency;
+    }
+
+    QList<Database::Slot> $slots = Database::Slot::retrieve();
+
+    for (const Database::Slot& slot : $slots)
+    {
+        qDebug() << "---- SLOT DEBUG ----";
+        qDebug() << "id:" << slot.id;
+        qDebug() << "reservationId:" << slot.reservationId;
+        qDebug() << "roomId:" << slot.roomId;
+        qDebug() << "date:" << slot.date.toString("yyyy-MM-dd");
+        qDebug() << "startTime:" << slot.startTime.toString("HH:mm");
+        qDebug() << "endTime:" << slot.endTime.toString("HH:mm");
+        qDebug() << "notes:" << slot.notes;
+        qDebug() << "overwriteable:" << slot.overwriteable;
+    }
 
     return true;
 }
@@ -1108,6 +1137,7 @@ void HomeWindow::drawSchedule() {
             }
         }
     }
+    // qDebug() << "Hello World!";
 }
 
 void HomeWindow::resizeEvent(QResizeEvent *event)
