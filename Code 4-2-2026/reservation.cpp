@@ -8,20 +8,28 @@ bool Database::Reservation::create()
     QSqlQuery query;
 
     return query.exec("CREATE TABLE IF NOT EXISTS reservations ("
-                      "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-                      "name TEXT, "
-                      "room TEXT, "
-                      "start_date TEXT, "
-                      "start_time TEXT, "
-                      "end_time TEXT, "
-                      "end_date TEXT, "
-                      "frequency INTEGER, "
-                      "by_weekday INTEGER, "
-                      "overwriteable INTEGER)"); // SQLite uses 1 for True, 0 for False
+                        "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                        "name TEXT, "
+                        "room TEXT, "
+                        "start_date TEXT, "
+                        "start_time TEXT, "
+                        "end_time TEXT, "
+                        "end_date TEXT, "
+                        "frequency INTEGER, "
+                        "by_weekday INTEGER, "
+                        "overwriteable INTEGER" // SQLite uses 1 for True, 0 for False
+                      ")");
 }
 
 std::optional<Database::Reservation> Database::Reservation::insert(const Reservation &r)
 {
+    QSqlDatabase db = QSqlDatabase::database();
+
+    if(!db.transaction())
+    {   qDebug() << db.lastError().text();
+        return std::nullopt;
+    }
+
     QSqlQuery query;
     query.prepare(
         "INSERT INTO reservations "
@@ -41,6 +49,7 @@ std::optional<Database::Reservation> Database::Reservation::insert(const Reserva
 
     if (!query.exec()) {
         qDebug() << "Reservation insert failed:" << query.lastError().text();
+        db.rollback();
         return std::nullopt;
     }
 
@@ -60,11 +69,14 @@ std::optional<Database::Reservation> Database::Reservation::insert(const Reserva
             r.overwriteable ? 1 : 0
             ))
     {
-        // Clean up the reservation since slots failed
-        QSqlQuery cleanup;
-        cleanup.prepare("DELETE FROM reservations WHERE id = :id");
-        cleanup.bindValue(":id", created.id);
-        cleanup.exec();
+        db.rollback();
+        return std::nullopt;
+    }
+
+    if(!db.commit())
+    {
+        qDebug() << db.lastError().text();
+        db.rollback();
         return std::nullopt;
     }
 

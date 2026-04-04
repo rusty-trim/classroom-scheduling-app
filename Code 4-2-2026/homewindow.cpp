@@ -227,6 +227,9 @@ bool HomeWindow::setupDatabase()
         return false;
     }
 
+    QSqlQuery pragmaQuery;
+    pragmaQuery.exec("PRAGMA foreign_keys = ON");
+
            // Creates tables
     if(!Database::Room::create())
         return false;

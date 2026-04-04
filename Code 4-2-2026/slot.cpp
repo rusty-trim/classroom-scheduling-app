@@ -12,13 +12,17 @@ bool Database::Slot::create()
            // Create table
     bool ok = query.exec(
         "CREATE TABLE IF NOT EXISTS slots ("
-        "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-        "reservation_id INTEGER, "
-        "room TEXT, "
-        "date TEXT, "
-        "start_time TEXT, "
-        "end_time TEXT, "
-        "overwriteable INTEGER)");
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "reservation_id INTEGER, "
+            "room TEXT, "
+            "date TEXT, "
+            "start_time TEXT, "
+            "end_time TEXT, "
+            "overwriteable INTEGER, "
+            "FOREIGN KEY (reservation_id) "
+                "REFERENCES reservations(id) "
+                "ON DELETE CASCADE"
+        ")");
 
     if (!ok) {
         qDebug() << "Table creation failed:" << query.lastError().text();
