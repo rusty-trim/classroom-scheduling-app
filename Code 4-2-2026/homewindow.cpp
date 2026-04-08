@@ -29,7 +29,8 @@
 #include <QGraphicsRectItem>
 #include <QPrinter>
 #include <QPrintDialog>
-#include <iostream>
+#include <QFileDialog>
+#include <QFile>
 
 #include "database.h"
 
@@ -1430,3 +1431,80 @@ void HomeWindow::on_btnPrintSchedule_clicked()
         }
     }
 }
+
+void HomeWindow::on_btnImportDatabase_clicked()
+{
+    QString srcPath = QFileDialog::getOpenFileName(this, tr("Select Database"), "", "Database Files (*.db)");
+    QString destPath = QCoreApplication::applicationDirPath() + "/reservations.db";
+
+    if (!srcPath.isEmpty()) {
+        // Close the old database connection
+        if (db.isOpen()) {
+            db.close();
+        }
+
+               // Remove existing file
+        if (QFile::exists(destPath)) {
+            if (!QFile::remove(destPath)) {
+                qDebug() << "Failed to remove existing database";
+                return;
+            }
+        }
+
+               // Copy new database file
+        QFile srcFile(srcPath);
+        if (!srcFile.open(QIODevice::ReadOnly)) {
+            qDebug() << "Failed to open source database:" << srcFile.errorString();
+            return;
+        }
+
+        QFile destFile(destPath);
+        if (!destFile.open(QIODevice::WriteOnly)) {
+            qDebug() << "Failed to open destination:" << destFile.errorString();
+            return;
+        }
+
+        if (destFile.write(srcFile.readAll()) == -1) {
+            qDebug() << "Failed to write file:" << destFile.errorString();
+            return;
+        }
+
+        srcFile.close();
+        destFile.close();
+
+        qDebug() << "Database replaced successfully!";
+
+        QSqlDatabase::database().close();
+        QSqlDatabase::removeDatabase(QSqlDatabase::defaultConnection);
+
+        // Create new default connection
+        db = QSqlDatabase::addDatabase("QSQLITE"); // default connection
+        db.setDatabaseName(destPath);
+        if (!db.open()) {
+            qDebug() << "Failed to open database:" << db.lastError().text();
+            return;
+        }
+
+               // Now you can safely load your rooms and reservations
+        loadRoomsFromDatabase();
+        loadReservationsFromDatabase();
+    }
+}
+
+void HomeWindow::on_btnExportDatabase_clicked()
+{
+    QString srcPath = QCoreApplication::applicationDirPath() + "/reservations.db";
+    QString destDir = QFileDialog::getExistingDirectory(this, tr("Select Folder"), "", QFileDialog::ShowDirsOnly);
+
+    if (!destDir.isEmpty()) {
+        // Build the full destination path including the file name
+        QString destPath = destDir + "/reservations.db";
+
+        if (QFile::copy(srcPath, destPath)) {
+            qDebug() << "Copied database file to the destination folder.";
+        } else {
+            qDebug() << "Failed to copy database file";
+        }
+    }
+}
+

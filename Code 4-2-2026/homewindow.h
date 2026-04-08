@@ -42,7 +42,11 @@ private slots:
 
     void on_btnPrintSchedule_clicked();
 
-private:
+    void on_btnImportDatabase_clicked();
+
+    void on_btnExportDatabase_clicked();
+
+  private:
     Ui::HomeWindow *ui;
 
     // Database Functions

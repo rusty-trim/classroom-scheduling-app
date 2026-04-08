@@ -27,7 +27,7 @@ QTabBar::tab {
        </string>
       </property>
       <property name="currentIndex">
-       <number>1</number>
+       <number>0</number>
       </property>
       <widget class="QWidget" name="welcomeTab">
        <attribute name="title">
@@ -168,7 +168,7 @@ QTabBar::tab {
          </spacer>
         </item>
         <item>
-        <layout class="QHBoxLayout" name="bottomButtonsLayout">
+         <layout class="QHBoxLayout" name="bottomButtonsLayout">
           <item>
            <widget class="QPushButton" name="btnHelpManual">
             <property name="minimumSize">
@@ -452,20 +452,61 @@ QTabBar::tab {
                </item>
               </widget>
              </item>
-             
              <item row="7" column="0" colspan="2">
               <widget class="QGroupBox" name="weekdayGroupBox">
                <property name="title">
                 <string>Repeat on Days:</string>
                </property>
                <layout class="QHBoxLayout" name="weekdayLayout">
-                <item><widget class="QCheckBox" name="chkMon"><property name="text"><string>Mon</string></property></widget></item>
-                <item><widget class="QCheckBox" name="chkTue"><property name="text"><string>Tue</string></property></widget></item>
-                <item><widget class="QCheckBox" name="chkWed"><property name="text"><string>Wed</string></property></widget></item>
-                <item><widget class="QCheckBox" name="chkThu"><property name="text"><string>Thu</string></property></widget></item>
-                <item><widget class="QCheckBox" name="chkFri"><property name="text"><string>Fri</string></property></widget></item>
-                <item><widget class="QCheckBox" name="chkSat"><property name="text"><string>Sat</string></property></widget></item>
-                <item><widget class="QCheckBox" name="chkSun"><property name="text"><string>Sun</string></property></widget></item>
+                <item>
+                 <widget class="QCheckBox" name="chkMon">
+                  <property name="text">
+                   <string>Mon</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QCheckBox" name="chkTue">
+                  <property name="text">
+                   <string>Tue</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QCheckBox" name="chkWed">
+                  <property name="text">
+                   <string>Wed</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QCheckBox" name="chkThu">
+                  <property name="text">
+                   <string>Thu</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QCheckBox" name="chkFri">
+                  <property name="text">
+                   <string>Fri</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QCheckBox" name="chkSat">
+                  <property name="text">
+                   <string>Sat</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QCheckBox" name="chkSun">
+                  <property name="text">
+                   <string>Sun</string>
+                  </property>
+                 </widget>
+                </item>
                </layout>
               </widget>
              </item>
@@ -476,7 +517,6 @@ QTabBar::tab {
                </property>
               </widget>
              </item>
-             
              <item row="9" column="1">
               <widget class="QPushButton" name="btnCreateReservation">
                <property name="minimumSize">
@@ -825,7 +865,7 @@ QTabBar::tab {
         <item>
          <widget class="QGraphicsView" name="scheduleView">
           <property name="alignment">
-           <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
+           <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignTop</set>
           </property>
          </widget>
         </item>
